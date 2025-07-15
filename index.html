@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Nookazon Advertisements</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f0f8ff; }
+    h1 { font-size: 2rem; }
+    .ad { background: white; border-radius: 12px; padding: 15px; margin: 10px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .controls button { margin-right: 10px; }
+    .like { cursor: pointer; color: red; }
+    form { margin-top: 30px; background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+  </style>
+</head>
+<body>
+  <h1>Nookazon Advertisements</h1>
+
+  <div class="controls">
+    <button onclick="filterAds('new')">NEW</button>
+    <button onclick="filterAds('popular')">POPULAR</button>
+    <button onclick="filterAds('random')">RANDOM</button>
+  </div>
+
+  <div id="adsContainer"></div>
+
+  <form id="adForm">
+    <h2>Submit a New Ad</h2>
+    <input type="text" name="username" placeholder="Your username" required><br><br>
+    <input type="text" name="message" placeholder="Your message" required><br><br>
+    <input type="url" name="link" placeholder="Link to your Nookazon profile" required><br><br>
+    <button type="submit">Submit Ad</button>
+  </form>
+
+  <script>
+    const scriptURL = "https://script.google.com/macros/s/AKfycbzM2FuOHJS5_0QbydJRqZmhS1SZv2ZHN18B4tvq_om92BU8_XQ5MKJ00CLjBlzfdQqCnQ/exec";
+    let ads = [];
+
+    async function fetchAds() {
+      const res = await fetch(scriptURL);
+      ads = await res.json();
+      filterAds('new');
+    }
+
+    function renderAds(list) {
+      const container = document.getElementById("adsContainer");
+      container.innerHTML = '';
+      list.forEach(ad => {
+        container.innerHTML += `
+          <div class="ad">
+            <strong>@${ad.Username}</strong><br>
+            ${ad.Message}<br>
+            <a href="${ad.Link}" target="_blank">${ad.Link}</a><br>
+            <small>${new Date(ad.Timestamp).toLocaleString()} | ❤️ ${ad.Likes}</small>
+            <div class="like" onclick="likeAd('${ad.Link}')">❤️ Like</div>
+          </div>`;
+      });
+    }
+
+    function filterAds(type) {
+      let sorted = [...ads];
+      if (type === 'new') sorted.sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp));
+      else if (type === 'popular') sorted.sort((a, b) => b.Likes - a.Likes);
+      else if (type === 'random') sorted = sorted.sort(() => 0.5 - Math.random());
+      renderAds(sorted);
+    }
+
+    async function likeAd(link) {
+      await fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify({ action: "like", Link: link })
+      });
+      fetchAds();
+    }
+
+    document.getElementById("adForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const form = e.target;
+      await fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "submit",
+          Username: form.username.value,
+          Message: form.message.value,
+          Link: form.link.value
+        })
+      });
+      form.reset();
+      fetchAds();
+    });
+
+    fetchAds();
+  </script>
+</body>
+</html>
