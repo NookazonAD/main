@@ -31,7 +31,16 @@
       color: #ddd;
     }
     .controls button { margin-right: 10px; }
-    .like { cursor: pointer; color: red; }
+    .like {
+      cursor: pointer;
+      color: green;
+      font-size: 1.1rem;
+      user-select: none;
+    }
+    .like.disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
     form, .admin-panel {
       margin-top: 30px;
       background: #fff;
@@ -85,24 +94,28 @@
   <script>
     const scriptURL = "https://script.google.com/macros/s/AKfycbzM2FuOHJS5_0QbydJRqZmhS1SZv2ZHN18B4tvq_om92BU8_XQ5MKJ00CLjBlzfdQqCnQ/exec";
     let ads = [];
+    let isAdmin = false;
 
     async function fetchAds() {
       const res = await fetch(scriptURL);
       ads = await res.json();
       filterAds('new');
+      if (isAdmin) renderAds(ads, "adminAds", true);
     }
 
     function renderAds(list, containerId = "adsContainer", showDelete = false) {
       const container = document.getElementById(containerId);
       container.innerHTML = '';
       list.forEach(ad => {
+        const likeKey = `liked_${ad.Link}`;
+        const liked = localStorage.getItem(likeKey) === "true";
         container.innerHTML += `
           <div class="ad">
             <strong>@${ad.Username}</strong><br>
             ${ad.Message}<br>
             <a href="${ad.Link}" target="_blank">${ad.Link}</a><br>
-            <small>${new Date(ad.Timestamp).toLocaleString()} | ❤️ ${ad.Likes}</small><br>
-            <div class="like" onclick="likeAd('${ad.Link}')">❤️ Like</div>
+            <small>${new Date(ad.Timestamp).toLocaleString()} | 👍 ${ad.Likes}</small><br>
+            <div class="like ${liked ? 'disabled' : ''}" onclick="likeAd('${ad.Link}')" ${liked ? 'title="Already liked"' : ''}>👍 Like</div>
             ${showDelete ? `<button onclick="deleteAd('${ad.Link}')">🗑️ Delete</button>` : ''}
           </div>`;
       });
@@ -117,10 +130,13 @@
     }
 
     async function likeAd(link) {
+      const likeKey = `liked_${link}`;
+      if (localStorage.getItem(likeKey) === "true") return;
       await fetch(scriptURL, {
         method: "POST",
         body: JSON.stringify({ action: "like", Link: link })
       });
+      localStorage.setItem(likeKey, "true");
       fetchAds();
     }
 
@@ -140,7 +156,6 @@
       fetchAds();
     });
 
-    // Dark mode toggle
     function toggleDark() {
       document.body.classList.toggle("dark");
       const icon = document.getElementById("darkToggle");
@@ -148,16 +163,15 @@
       localStorage.setItem("nookazon-theme", document.body.classList.contains("dark") ? "dark" : "light");
     }
 
-    // Load dark mode preference
     window.onload = () => {
-      if (localStorage.getItem("nookazon-theme") === "dark" || (window.matchMedia("(prefers-color-scheme: dark)").matches && !localStorage.getItem("nookazon-theme"))) {
+      if (localStorage.getItem("nookazon-theme") === "dark" ||
+         (!localStorage.getItem("nookazon-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
         document.body.classList.add("dark");
         document.getElementById("darkToggle").textContent = "☀️";
       }
       fetchAds();
     };
 
-    // Admin panel
     function toggleAdmin() {
       const panel = document.getElementById("adminPanel");
       panel.style.display = panel.style.display === "none" ? "block" : "none";
@@ -166,8 +180,9 @@
     function verifyAdmin() {
       const pass = document.getElementById("adminPass").value;
       if (pass === "nookadmin") {
-        renderAds(ads, "adminAds", true);
+        isAdmin = true;
         document.getElementById("adminPass").style.display = "none";
+        renderAds(ads, "adminAds", true);
       } else {
         alert("Incorrect password.");
       }
